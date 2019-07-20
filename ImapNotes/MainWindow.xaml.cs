@@ -11,6 +11,7 @@ using Google.Apis.Util.Store;
 using System.IO;
 using System.Threading;
 using System.Collections.ObjectModel;
+using System.Text;
 
 namespace ImapNotes
 {
@@ -21,10 +22,10 @@ namespace ImapNotes
         static string[] Scopes = { GmailService.Scope.GmailReadonly };
         static string ApplicationName = "Gmail API .NET Quickstart";
         public ObservableCollection<Message> Messages { get; set; }
+        public String SelectedMessage { get; set; }
 
         private GmailService GmailService;
 
-        Message selectedMessage;
 
         public MainWindow()
         {
@@ -81,21 +82,23 @@ namespace ImapNotes
             });
         }
 
-        private void OnSelected(object sender, RoutedEventArgs e)
-        {
-            ListBoxItem lbi = e.Source as ListBoxItem;
-        }
-
         void updateSelectedMessage(Message message)
         {
-            this.selectedMessage = message;
-            Console.WriteLine(message.Payload.Body.Data);
-            this.mainNote.Text = this.selectedMessage.Payload.Body.Data;
+            SelectedMessage = Base64UrlDecode(message.Payload.Body.Data);
         }
 
         private void noteListItemClick(object sender, RoutedEventArgs e)
         {
             // do something
+        }
+        public static string Base64UrlDecode(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return "<strong>Message body was not returned from Google</strong>";
+
+            string InputStr = input.Replace("-", "+").Replace("_", "/");
+            return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(InputStr));
+
         }
     }
 }
