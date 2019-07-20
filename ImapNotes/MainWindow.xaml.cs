@@ -1,53 +1,69 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Gmail.v1;
 using Google.Apis.Gmail.v1.Data;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
+using System.Collections.ObjectModel;
 
 namespace ImapNotes
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window
     {
         // If modifying these scopes, delete your previously saved credentials
         // at ~/.credentials/gmail-dotnet-quickstart.json
         static string[] Scopes = { GmailService.Scope.GmailReadonly };
         static string ApplicationName = "Gmail API .NET Quickstart";
+        public ObservableCollection<Message> Messages { get; set; }
+
+        private GmailService GmailService;
+
+        Message selectedMessage;
 
         public MainWindow()
         {
+            Messages = new ObservableCollection<Message>();
             InitializeComponent();
+            SetupGmailService();
+       
+            UsersResource.MessagesResource.ListRequest request = GmailService.Users.Messages.List("me");
+            request.Q = "label: notes";
 
+            bool mainMessageSet = false;
+            IList<Message> messages = request.Execute().Messages;
+
+            if (messages != null && messages.Count > 0)
+            {
+                foreach (var message in messages)
+                {
+                    var messageRequest = GmailService.Users.Messages.Get("me", message.Id);
+                    var fetchedMessage = messageRequest.Execute();
+
+                    Messages.Add(fetchedMessage);
+
+                    if (!mainMessageSet)
+                    {
+                        this.updateSelectedMessage(fetchedMessage);
+                    }
+                }
+            }
+
+            DataContext = this;
+        }
+
+        private void SetupGmailService()
+        {
             UserCredential credential;
 
             using (var stream =
                 new FileStream("credentials.json", FileMode.Open, FileAccess.Read))
             {
-                // The file token.json stores the user's access and refresh tokens, and is created
-                // automatically when the authorization flow completes for the first time.
                 string credPath = "token.json";
                 credential = GoogleWebAuthorizationBroker.AuthorizeAsync(
                     GoogleClientSecrets.Load(stream).Secrets,
@@ -58,41 +74,28 @@ namespace ImapNotes
                 Console.WriteLine("Credential file saved to: " + credPath);
             }
 
-            // Create Gmail API service.
-            var service = new GmailService(new BaseClientService.Initializer()
+            GmailService = new GmailService(new BaseClientService.Initializer()
             {
                 HttpClientInitializer = credential,
                 ApplicationName = ApplicationName,
             });
+        }
 
-            // Define parameters of request.
-            UsersResource.MessagesResource.ListRequest request = service.Users.Messages.List("me");
-            request.Q = "label: notes";
+        private void OnSelected(object sender, RoutedEventArgs e)
+        {
+            ListBoxItem lbi = e.Source as ListBoxItem;
+        }
 
-            // List labels.
-            IList<Message> messages = request.Execute().Messages;
-            Console.WriteLine("Messages:");
-            if (messages != null && messages.Count > 0)
-            {
-                foreach (var message in messages)
-                {
-                    var messageRequest = service.Users.Messages.Get("me", message.Id);
-                    var fetchedMessage = messageRequest.Execute();
+        void updateSelectedMessage(Message message)
+        {
+            this.selectedMessage = message;
+            Console.WriteLine(message.Payload.Body.Data);
+            this.mainNote.Text = this.selectedMessage.Payload.Body.Data;
+        }
 
-                    ListBoxItem item = new ListBoxItem
-                    {
-                        Height = 50,
-                        Content = fetchedMessage.Snippet
-                    };
-
-                    this.noteList.Items.Add(item);
-                }
-            }
-            else
-            {
-                Console.WriteLine("No messages found.");
-            }
-            Console.Read();
+        private void noteListItemClick(object sender, RoutedEventArgs e)
+        {
+            // do something
         }
     }
 }
